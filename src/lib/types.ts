@@ -129,6 +129,18 @@ export interface UploadCompleteRequest {
   fileSize: number;
 }
 
+export type DocumentContentKind =
+  | 'pdf'
+  | 'text'
+  | 'html'
+  | 'markdown'
+  | 'json'
+  | 'xml'
+  | 'rtf'
+  | 'image'
+  | 'office'
+  | 'binary';
+
 export interface LibraryDocument {
   _id: string;
   id?: string; // Mongoose virtual — not always present; use _id
@@ -142,6 +154,9 @@ export interface LibraryDocument {
   uploadedBy?: string;
   description?: string;
   isVerified?: boolean;
+  /** Which viewer to use — from GET /library/:id */
+  contentKind?: DocumentContentKind | string;
+  hasTranscript?: boolean;
   createdAt: string;
   updatedAt?: string;
   metadata?: {
@@ -150,12 +165,21 @@ export interface LibraryDocument {
     citation?: string;
     jurisdiction?: string;
     description?: string;
+    contentKind?: DocumentContentKind | string;
   };
 }
 
 export interface SignedUrlData {
   signedUrl: string;
   expiresIn: number;
+  contentKind?: DocumentContentKind | string;
+  s3Key?: string;
+}
+
+export interface DocumentTextData {
+  text: string;
+  contentKind: DocumentContentKind | string;
+  cached: boolean;
 }
 
 export interface BookmarkData {
