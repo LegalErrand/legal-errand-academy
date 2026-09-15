@@ -26,8 +26,6 @@ const SKIP_PHRASES = [
   'skip to content',
 ];
 
-type ViewMode = 'original' | 'transcript';
-
 function isSkipLine(line: string): boolean {
   const low = line.trim().toLowerCase();
   return SKIP_PHRASES.some(
@@ -101,7 +99,7 @@ export default function LibraryDocumentPage() {
   const [contentKind, setContentKind] = useState<string>('binary');
   const [docText, setDocText] = useState<string | null>(null);
   const [textLoading, setTextLoading] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('original');
+  const [originalOpen, setOriginalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeHeading, setActiveHeading] = useState('');
@@ -149,17 +147,8 @@ export default function LibraryDocumentPage() {
             const text = textRes.data?.text?.trim() ?? '';
             if (textRes.data?.contentKind) {
               setContentKind(textRes.data.contentKind);
-              kind = textRes.data.contentKind;
             }
             setDocText(text || null);
-            // Prefer readable transcript for text-like sources; PDF keeps original first.
-            if (text && isTextReadableKind(kind)) {
-              setViewMode('transcript');
-            } else if (kind === 'pdf') {
-              setViewMode('original');
-            } else if (text) {
-              setViewMode('transcript');
-            }
           } catch {
             setDocText(null);
           } finally {
@@ -171,6 +160,20 @@ export default function LibraryDocumentPage() {
       }
     })();
   }, [router, id]);
+
+  useEffect(() => {
+    if (!originalOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOriginalOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [originalOpen]);
 
   if (loading)
     return (
@@ -195,9 +198,9 @@ export default function LibraryDocumentPage() {
 
   const caseText = docText ?? null;
   const headings = caseText ? extractHeadings(caseText) : [];
-  const showOriginalTab = contentKind === 'pdf' || contentKind === 'image';
-  const showTranscriptTab = Boolean(caseText) || textLoading || contentKind === 'pdf';
-  const showViewToggle = showOriginalTab && showTranscriptTab;
+  const canOpenOriginal =
+    Boolean(signedUrl) &&
+    (contentKind === 'pdf' || contentKind === 'image' || contentKind === 'binary');
 
   return (
     <div className={styles.page}>
@@ -216,19 +219,29 @@ export default function LibraryDocumentPage() {
             {doc.metadata?.citation && (
               <span className={styles.docMetaChip}>{doc.metadata.citation}</span>
             )}
-            <span className={styles.docMetaChip}>{contentKind}</span>
           </div>
         </div>
-        {signedUrl && (
-          <a
-            href={signedUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.downloadBtn}
-          >
-            Download
-          </a>
-        )}
+        <div className={styles.topBarActions}>
+          {canOpenOriginal && (
+            <button
+              type="button"
+              className={styles.originalCta}
+              onClick={() => setOriginalOpen(true)}
+            >
+              Open original
+            </button>
+          )}
+          {signedUrl && (
+            <a
+              href={signedUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.downloadBtn}
+            >
+              Download
+            </a>
+          )}
+        </div>
       </header>
 
       <div className={styles.viewerLayout}>
@@ -247,87 +260,38 @@ export default function LibraryDocumentPage() {
             ))
           ) : (
             <p className={styles.chaptersEmpty}>
-              {viewMode === 'transcript' && textLoading
-                ? 'Extracting sections…'
-                : 'No sections found.'}
+              {textLoading ? 'Extracting sections…' : 'No sections found.'}
             </p>
           )}
         </aside>
 
         <div className={styles.centerColumn}>
-          {showViewToggle && (
-            <div className={styles.viewToggle} role="tablist" aria-label="Document view">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'original'}
-                className={`${styles.viewTab} ${viewMode === 'original' ? styles.viewTabActive : ''}`}
-                onClick={() => setViewMode('original')}
-              >
-                Original
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'transcript'}
-                className={`${styles.viewTab} ${viewMode === 'transcript' ? styles.viewTabActive : ''}`}
-                onClick={() => setViewMode('transcript')}
-              >
-                Transcript
-              </button>
+          {textLoading ? (
+            <div className={styles.state}>
+              <Spinner size={22} label="Loading transcript…" />
             </div>
-          )}
-
-          {viewMode === 'original' && contentKind === 'pdf' && signedUrl ? (
-            <>
-              <iframe title={doc.title} src={signedUrl} className={styles.pdfViewer} />
-              <div className={styles.pdfFallback}>
-                PDF not showing?{' '}
-                <a href={signedUrl} target="_blank" rel="noopener noreferrer">
-                  Open in new tab
-                </a>
-              </div>
-            </>
-          ) : viewMode === 'original' && contentKind === 'image' && signedUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={signedUrl} alt={doc.title} className={styles.imageViewer} />
-          ) : viewMode === 'transcript' || isTextReadableKind(contentKind) ? (
-            textLoading ? (
-              <div className={styles.state}>
-                <Spinner size={22} label="Transcribing document…" />
-              </div>
-            ) : caseText ? (
-              <CaseTextReader text={caseText} />
-            ) : (
-              <div className={styles.noPreview}>
-                <p>No transcript available for this source yet.</p>
-                {signedUrl && (
-                  <a
-                    href={signedUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.downloadBtn}
-                  >
-                    Open original
-                  </a>
-                )}
-              </div>
-            )
+          ) : caseText ? (
+            <CaseTextReader text={caseText} />
           ) : (
             <div className={styles.noPreview}>
-              <p>
-                Preview isn&apos;t available for this file type
-                {contentKind ? ` (${contentKind})` : ''}. Download to open it locally —
-                transcription support can be added as new sources come online.
-              </p>
-              {signedUrl && (
+              <p>No transcript available for this source yet.</p>
+              {canOpenOriginal && (
+                <button
+                  type="button"
+                  className={styles.originalCta}
+                  onClick={() => setOriginalOpen(true)}
+                >
+                  Open original
+                </button>
+              )}
+              {!canOpenOriginal && signedUrl && (
                 <a
                   href={signedUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={styles.downloadBtn}
                 >
-                  Open in new tab
+                  Download file
                 </a>
               )}
             </div>
@@ -340,6 +304,42 @@ export default function LibraryDocumentPage() {
           docDescription={doc.metadata?.description}
         />
       </div>
+
+      {originalOpen && signedUrl && (
+        <div
+          className={styles.originalOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Original document"
+        >
+          <div className={styles.originalOverlayBar}>
+            <p className={styles.originalOverlayTitle}>{doc.title}</p>
+            <div className={styles.originalOverlayActions}>
+              <a
+                href={signedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.downloadBtn}
+              >
+                Open in new tab
+              </a>
+              <button
+                type="button"
+                className={styles.originalCloseBtn}
+                onClick={() => setOriginalOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+          {contentKind === 'image' ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={signedUrl} alt={doc.title} className={styles.originalImage} />
+          ) : (
+            <iframe title={doc.title} src={signedUrl} className={styles.originalFrame} />
+          )}
+        </div>
+      )}
     </div>
   );
 }
