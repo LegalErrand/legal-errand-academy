@@ -18,6 +18,7 @@ import type {
   AvatarUrlData,
   LibraryDocument,
   SignedUrlData,
+  DocumentTextData,
   BookmarkData,
   DashboardData,
   Goal,
@@ -505,6 +506,10 @@ export function getSignedDownloadUrl(
   token: string
 ): Promise<ApiResponse<SignedUrlData>> {
   return authedGet<ApiResponse<SignedUrlData>>(`/library/${id}/access`, token);
+}
+
+export function getDocumentText(id: string, token: string): Promise<ApiResponse<DocumentTextData>> {
+  return authedGet<ApiResponse<DocumentTextData>>(`/library/${id}/text`, token);
 }
 
 export function toggleBookmark(id: string, token: string): Promise<ApiResponse<BookmarkData>> {

@@ -6,20 +6,19 @@ import Link from 'next/link';
 import {
   getLibraryDocument,
   getSignedDownloadUrl,
+  getDocumentText,
   getFetchErrorMessage,
   getAccessToken,
 } from '@/lib';
-import type { LibraryDocument } from '@/lib';
+import type { DocumentContentKind, LibraryDocument } from '@/lib';
 import { Spinner } from '@/components';
 import LibraryAIPanel from '@/components/LibraryAIPanel';
 import pStyles from './page.module.scss';
 import cStyles from './LibraryContent.module.scss';
 const styles = { ...pStyles, ...cStyles };
 
-// Matches all-caps headings optionally ending with colon, e.g. HELD:, PARTIES, RATIO DECIDENDI
 const SECTION_RE = /^[A-Z][A-Z\s/&(),-]{2,}:?$/;
 
-// Nav artifacts injected by NigeriaLII's accessibility links
 const SKIP_PHRASES = [
   'skip to document content',
   'skip to main content',
@@ -27,9 +26,10 @@ const SKIP_PHRASES = [
   'skip to content',
 ];
 
+type ViewMode = 'original' | 'transcript';
+
 function isSkipLine(line: string): boolean {
   const low = line.trim().toLowerCase();
-  // Filter lines that are entirely (or essentially) a skip-nav phrase
   return SKIP_PHRASES.some(
     (p) => low === p || low === p + '.' || low.replace(/[^a-z ]/g, '') === p
   );
@@ -47,6 +47,24 @@ function extractHeadings(text: string): string[] {
     .split('\n')
     .map((l) => l.trim())
     .filter((l) => SECTION_RE.test(l));
+}
+
+function resolveKind(
+  doc: LibraryDocument | null,
+  fallback?: string | null
+): DocumentContentKind | string {
+  return doc?.contentKind || doc?.metadata?.contentKind || fallback || 'binary';
+}
+
+function isTextReadableKind(kind: string): boolean {
+  return (
+    kind === 'text' ||
+    kind === 'html' ||
+    kind === 'markdown' ||
+    kind === 'json' ||
+    kind === 'xml' ||
+    kind === 'rtf'
+  );
 }
 
 function CaseTextReader({ text }: { text: string }) {
@@ -80,7 +98,10 @@ export default function LibraryDocumentPage() {
   const { id } = useParams<{ id: string }>();
   const [doc, setDoc] = useState<LibraryDocument | null>(null);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [contentKind, setContentKind] = useState<string>('binary');
   const [docText, setDocText] = useState<string | null>(null);
+  const [textLoading, setTextLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('original');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeHeading, setActiveHeading] = useState('');
@@ -99,20 +120,50 @@ export default function LibraryDocumentPage() {
           getLibraryDocument(id, token),
           getSignedDownloadUrl(id, token),
         ]);
+
+        let kind: string = 'binary';
         if (docRes.status === 'fulfilled' && docRes.value.data) {
-          setDoc(docRes.value.data);
+          const d = docRes.value.data;
+          setDoc(d);
+          kind = resolveKind(d);
         } else if (docRes.status === 'rejected') {
           setError(getFetchErrorMessage(docRes.reason));
         }
+
         if (urlRes.status === 'fulfilled' && urlRes.value.data?.signedUrl) {
-          const url = urlRes.value.data.signedUrl;
-          setSignedUrl(url);
-          // Fetch the text content so we can render it styled (not in a raw iframe)
+          setSignedUrl(urlRes.value.data.signedUrl);
+          if (urlRes.value.data.contentKind) {
+            kind = urlRes.value.data.contentKind;
+          }
+        }
+        setContentKind(kind);
+
+        // Never fetch raw S3 bytes as text — use API transcript (PDF-safe + multi-source).
+        const needsTranscript =
+          kind === 'pdf' || isTextReadableKind(kind) || kind === 'office' || kind === 'binary';
+
+        if (needsTranscript) {
+          setTextLoading(true);
           try {
-            const textRes = await fetch(url);
-            if (textRes.ok) setDocText(await textRes.text());
+            const textRes = await getDocumentText(id, token);
+            const text = textRes.data?.text?.trim() ?? '';
+            if (textRes.data?.contentKind) {
+              setContentKind(textRes.data.contentKind);
+              kind = textRes.data.contentKind;
+            }
+            setDocText(text || null);
+            // Prefer readable transcript for text-like sources; PDF keeps original first.
+            if (text && isTextReadableKind(kind)) {
+              setViewMode('transcript');
+            } else if (kind === 'pdf') {
+              setViewMode('original');
+            } else if (text) {
+              setViewMode('transcript');
+            }
           } catch {
-            /* fall through — will show download link only */
+            setDocText(null);
+          } finally {
+            setTextLoading(false);
           }
         }
       } finally {
@@ -142,8 +193,11 @@ export default function LibraryDocumentPage() {
       </div>
     );
 
-  const caseText = docText ?? doc.metadata?.description ?? null;
+  const caseText = docText ?? null;
   const headings = caseText ? extractHeadings(caseText) : [];
+  const showOriginalTab = contentKind === 'pdf' || contentKind === 'image';
+  const showTranscriptTab = Boolean(caseText) || textLoading || contentKind === 'pdf';
+  const showViewToggle = showOriginalTab && showTranscriptTab;
 
   return (
     <div className={styles.page}>
@@ -162,6 +216,7 @@ export default function LibraryDocumentPage() {
             {doc.metadata?.citation && (
               <span className={styles.docMetaChip}>{doc.metadata.citation}</span>
             )}
+            <span className={styles.docMetaChip}>{contentKind}</span>
           </div>
         </div>
         {signedUrl && (
@@ -191,16 +246,80 @@ export default function LibraryDocumentPage() {
               </button>
             ))
           ) : (
-            <p className={styles.chaptersEmpty}>No sections found.</p>
+            <p className={styles.chaptersEmpty}>
+              {viewMode === 'transcript' && textLoading
+                ? 'Extracting sections…'
+                : 'No sections found.'}
+            </p>
           )}
         </aside>
 
-        <div className={styles.centerPanel}>
-          {caseText ? (
-            <CaseTextReader text={caseText} />
+        <div className={styles.centerColumn}>
+          {showViewToggle && (
+            <div className={styles.viewToggle} role="tablist" aria-label="Document view">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === 'original'}
+                className={`${styles.viewTab} ${viewMode === 'original' ? styles.viewTabActive : ''}`}
+                onClick={() => setViewMode('original')}
+              >
+                Original
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === 'transcript'}
+                className={`${styles.viewTab} ${viewMode === 'transcript' ? styles.viewTabActive : ''}`}
+                onClick={() => setViewMode('transcript')}
+              >
+                Transcript
+              </button>
+            </div>
+          )}
+
+          {viewMode === 'original' && contentKind === 'pdf' && signedUrl ? (
+            <>
+              <iframe title={doc.title} src={signedUrl} className={styles.pdfViewer} />
+              <div className={styles.pdfFallback}>
+                PDF not showing?{' '}
+                <a href={signedUrl} target="_blank" rel="noopener noreferrer">
+                  Open in new tab
+                </a>
+              </div>
+            </>
+          ) : viewMode === 'original' && contentKind === 'image' && signedUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={signedUrl} alt={doc.title} className={styles.imageViewer} />
+          ) : viewMode === 'transcript' || isTextReadableKind(contentKind) ? (
+            textLoading ? (
+              <div className={styles.state}>
+                <Spinner size={22} label="Transcribing document…" />
+              </div>
+            ) : caseText ? (
+              <CaseTextReader text={caseText} />
+            ) : (
+              <div className={styles.noPreview}>
+                <p>No transcript available for this source yet.</p>
+                {signedUrl && (
+                  <a
+                    href={signedUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.downloadBtn}
+                  >
+                    Open original
+                  </a>
+                )}
+              </div>
+            )
           ) : (
             <div className={styles.noPreview}>
-              <p>No preview available for this document.</p>
+              <p>
+                Preview isn&apos;t available for this file type
+                {contentKind ? ` (${contentKind})` : ''}. Download to open it locally —
+                transcription support can be added as new sources come online.
+              </p>
               {signedUrl && (
                 <a
                   href={signedUrl}
