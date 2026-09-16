@@ -43,7 +43,10 @@ export default function StandardChat({
   const [sending, setSending] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [error, setError] = useState('');
-  const [currentSessionId, setCurrentSessionId] = useState<string | undefined>(sessionId);
+  // Starts undefined even when a sessionId is supplied (e.g. opened from an
+  // activity link), so the effect below treats it as a fresh selection and
+  // loads the saved transcript instead of showing an empty thread.
+  const [currentSessionId, setCurrentSessionId] = useState<string | undefined>(undefined);
   const bottomRef = useRef<HTMLDivElement>(null);
   const didAutoSend = useRef(false);
   const abortRef = useRef<AbortController | null>(null);

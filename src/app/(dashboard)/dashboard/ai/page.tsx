@@ -36,8 +36,14 @@ export default function ReasoningPage() {
     }
     setToken(t);
     void loadConversations(t);
-    const q = new URLSearchParams(window.location.search).get('q') ?? '';
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get('q') ?? '';
     if (q) setInitialQuery(q);
+
+    // Activity entries link here with the conversation to reopen.
+    const session = params.get('session');
+    if (session) setActiveSessionId(session);
+    if (params.get('mode') === 'socratic') setMode('socratic');
   }, [router]);
 
   async function loadConversations(t: string) {
@@ -215,6 +221,7 @@ export default function ReasoningPage() {
         ) : (
           <SocraticChat
             token={token}
+            resumeSessionId={activeSessionId}
             startSocraticSession={startSocraticSession}
             respondSocratic={respondSocratic}
             endSocraticSession={endSocraticSession}

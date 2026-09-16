@@ -16,19 +16,43 @@
 }
 
 .activityItem {
-  display: flex;
-  align-items: center;
-  gap: $space-3;
-  padding: $space-2 0;
   border-bottom: 1px solid $gray-200;
-  cursor: pointer;
-  transition: background 0.1s;
+  list-style: none;
 
   &:last-child {
     border-bottom: none;
   }
+}
+
+// Shared row layout. Only the link variant is interactive, so rows without a
+// destination no longer advertise a click that does nothing.
+.activityLink,
+.activityStatic {
+  display: flex;
+  align-items: center;
+  gap: $space-3;
+  padding: $space-2 0;
+  width: 100%;
+  text-decoration: none;
+  color: inherit;
+}
+
+.activityLink {
+  cursor: pointer;
+  border-radius: $radius;
+  transition: background 0.1s;
+
   &:hover {
     background: $gray-50;
+  }
+
+  &:hover .activityTitle {
+    color: $primary;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $primary;
+    outline-offset: 2px;
   }
 }
 
