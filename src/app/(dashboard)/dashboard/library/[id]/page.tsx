@@ -13,6 +13,7 @@ import {
 import type { DocumentContentKind, LibraryDocument } from '@/lib';
 import { Spinner } from '@/components';
 import LibraryAIPanel from '@/components/LibraryAIPanel';
+import DocumentViewerOverlay from '@/components/DocumentViewerOverlay';
 import pStyles from './page.module.scss';
 import cStyles from './LibraryContent.module.scss';
 const styles = { ...pStyles, ...cStyles };
@@ -306,39 +307,12 @@ export default function LibraryDocumentPage() {
       </div>
 
       {originalOpen && signedUrl && (
-        <div
-          className={styles.originalOverlay}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Original document"
-        >
-          <div className={styles.originalOverlayBar}>
-            <p className={styles.originalOverlayTitle}>{doc.title}</p>
-            <div className={styles.originalOverlayActions}>
-              <a
-                href={signedUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.downloadBtn}
-              >
-                Open in new tab
-              </a>
-              <button
-                type="button"
-                className={styles.originalCloseBtn}
-                onClick={() => setOriginalOpen(false)}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-          {contentKind === 'image' ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={signedUrl} alt={doc.title} className={styles.originalImage} />
-          ) : (
-            <iframe title={doc.title} src={signedUrl} className={styles.originalFrame} />
-          )}
-        </div>
+        <DocumentViewerOverlay
+          title={doc.title}
+          src={signedUrl}
+          contentKind={contentKind}
+          onClose={() => setOriginalOpen(false)}
+        />
       )}
     </div>
   );

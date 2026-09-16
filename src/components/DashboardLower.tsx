@@ -128,32 +128,54 @@ export default function DashboardLower({
             </ul>
           ) : activity.length > 0 ? (
             <ul className={styles.notesList}>
-              {activity.slice(0, 5).map((item) => (
-                <li key={item._id} className={styles.noteItem}>
-                  <div
-                    className={`${styles.noteIcon} ${item.type === 'case' ? styles.noteIconCase : styles.noteIconDoc}`}
-                    aria-hidden="true"
-                  >
-                    {item.type === 'case' ? '⚖' : item.type === 'quiz' ? '📝' : '💬'}
-                  </div>
-                  <div className={styles.noteBody}>
-                    <p className={styles.noteTitle}>{item.title || 'Untitled'}</p>
-                    <p className={styles.noteMeta}>
-                      {item.subtitle ? `${item.subtitle} · ` : ''}
-                      {new Date(item.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path
-                      d="M9 18l6-6-6-6"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </li>
-              ))}
+              {activity.slice(0, 5).map((item) => {
+                const body = (
+                  <>
+                    <div
+                      className={`${styles.noteIcon} ${item.type === 'case' ? styles.noteIconCase : styles.noteIconDoc}`}
+                      aria-hidden="true"
+                    >
+                      {item.type === 'case' ? '⚖' : item.type === 'quiz' ? '📝' : '💬'}
+                    </div>
+                    <div className={styles.noteBody}>
+                      <p className={styles.noteTitle}>{item.title || 'Untitled'}</p>
+                      <p className={styles.noteMeta}>
+                        {item.subtitle ? `${item.subtitle} · ` : ''}
+                        {new Date(item.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    {item.link && (
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M9 18l6-6-6-6"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
+                  </>
+                );
+
+                return (
+                  <li key={item._id} className={styles.noteItem}>
+                    {item.link ? (
+                      <Link href={item.link} className={styles.noteLink}>
+                        {body}
+                      </Link>
+                    ) : (
+                      <div className={styles.noteStatic}>{body}</div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <div className={styles.emptyState}>

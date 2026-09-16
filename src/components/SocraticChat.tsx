@@ -1,7 +1,7 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import { getFetchErrorMessage, useTypewriter } from '@/lib';
+import { useEffect, useRef, useState } from 'react';
+import { getAiConversation, getFetchErrorMessage, useTypewriter } from '@/lib';
 import type {
   SocraticStartRequest,
   SocraticStartResponse,
@@ -18,6 +18,8 @@ interface SocMsg {
 
 interface Props {
   token: string;
+  /** When set, the component resumes this saved session instead of starting fresh. */
+  resumeSessionId?: string;
   startSocraticSession: (
     data: SocraticStartRequest,
     token: string
@@ -48,11 +50,13 @@ function AiBubble({ text, isLatest }: { text: string; isLatest: boolean }) {
 
 export default function SocraticChat({
   token,
+  resumeSessionId,
   startSocraticSession,
   respondSocratic,
   endSocraticSession,
 }: Props) {
   const [phase, setPhase] = useState<'setup' | 'active' | 'ended'>('setup');
+  const [resuming, setResuming] = useState(false);
   const [topic, setTopic] = useState('');
   const [subject, setSubject] = useState('');
   const [sessionId, setSessionId] = useState('');
@@ -63,6 +67,41 @@ export default function SocraticChat({
   const [error, setError] = useState('');
   const [endSummary, setEndSummary] = useState<{ summary: string; score: number } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Resume a saved session: pull its transcript and drop straight into the
+  // active phase instead of showing the topic-setup form.
+  useEffect(() => {
+    if (!resumeSessionId || !token) return;
+    let cancelled = false;
+
+    setResuming(true);
+    setError('');
+    void (async () => {
+      try {
+        const res = await getAiConversation(resumeSessionId, token);
+        if (cancelled) return;
+        const convo = res.data;
+        const stored = (convo?.messages ?? []).map((m) => ({
+          role: m.role === 'assistant' ? ('ai' as const) : ('user' as const),
+          text: m.content,
+        }));
+
+        setSessionId(resumeSessionId);
+        setTopic((convo?.topic ?? convo?.title ?? '').replace(/^Socratic:\s*/, ''));
+        setMessages(stored);
+        setLatestAiIdx(stored.map((m) => m.role).lastIndexOf('ai'));
+        setPhase('active');
+      } catch (err) {
+        if (!cancelled) setError(getFetchErrorMessage(err));
+      } finally {
+        if (!cancelled) setResuming(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resumeSessionId, token]);
 
   function scrollBottom() {
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);

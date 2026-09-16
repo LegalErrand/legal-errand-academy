@@ -7,4 +7,5 @@ export * from './geo';
 export * from './types';
 export * from './uploadErrors';
 export * from './validation';
+export * from './exportNote';
 export { useTypewriter } from './useTypewriter';
