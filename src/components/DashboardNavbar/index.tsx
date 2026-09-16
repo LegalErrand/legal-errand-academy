@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getAccessToken, getDashboard } from '@/lib';
-import { SparklesIcon, BellIcon } from '../icons';
+import { SparklesIcon } from '../icons';
 import styles from './DashboardNavbar.module.scss';
 
 export default function DashboardNavbar() {
@@ -54,9 +54,6 @@ export default function DashboardNavbar() {
             </span>
           </div>
         )}
-        <button className={styles.iconBtn}>
-          <BellIcon size={20} />
-        </button>
         <div className={styles.avatar}>
           <Image src="/icons/avatar.svg" alt="User" width={36} height={36} />
         </div>

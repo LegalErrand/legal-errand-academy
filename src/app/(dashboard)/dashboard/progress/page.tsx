@@ -238,7 +238,8 @@ function GoalCard({ goal }: { goal: Goal }) {
           {goal.currentValue} / {goal.targetValue} {goal.unit}
         </p>
       </div>
-      <button className={`${styles.goalBtn} ${btnClass}`}>{label}</button>
+      {/* Status, not an action — rendered as a label so it does not invite a click. */}
+      <span className={`${styles.goalBtn} ${btnClass}`}>{label}</span>
     </div>
   );
 }

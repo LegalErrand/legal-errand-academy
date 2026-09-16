@@ -13,6 +13,7 @@ import {
   createNote,
   getFetchErrorMessage,
   getAccessToken,
+  downloadNoteAsMarkdown,
 } from '@/lib';
 import type { Note, NoteTemplate } from '@/lib';
 import TemplateForm from '@/components/TemplateForm';
@@ -162,7 +163,15 @@ export default function NoteWorkspacePage() {
           {draftRestored && <span className={styles.draftBanner}>Draft restored</span>}
           {saving && <span className={styles.savingLabel}>Saving…</span>}
           {saveErr && <span className={styles.saveErrLabel}>{saveErr}</span>}
-          <button className={styles.exportBtn}>Export</button>
+          <button
+            className={styles.exportBtn}
+            onClick={() => {
+              const filename = downloadNoteAsMarkdown(note);
+              addToast('success', 'Note exported', filename);
+            }}
+          >
+            Export
+          </button>
           <button
             className={styles.saveNoteBtn}
             onClick={() => handleSave(note.title, note.content)}

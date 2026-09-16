@@ -225,6 +225,8 @@ export interface ActivityItem {
   title: string;
   subtitle: string;
   createdAt: string;
+  /** In-app destination for this entry; absent when it has no detail view. */
+  link?: string;
 }
 
 export interface Goal {
@@ -436,6 +438,9 @@ export interface AiConversationMessage {
 
 export interface AiConversationDetail extends AiConversation {
   messages: AiConversationMessage[];
+  /** Socratic-only fields, present when `mode` is 'socratic'. */
+  topic?: string;
+  hintsUsed?: number;
 }
 
 export interface AiChatRequest {

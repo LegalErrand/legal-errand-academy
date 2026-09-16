@@ -1,9 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { getDashboardActivity, getAccessToken } from '@/lib';
-import type { DashboardData } from '@/lib';
+import type { ActivityItem, DashboardData } from '@/lib';
 import { Spinner, Shimmer } from '@/components';
 import mStyles from './ActivityHistoryModal.module.scss';
+import Link from 'next/link';
 import lStyles from './ActivityList.module.scss';
 const styles = { ...mStyles, ...lStyles };
 
@@ -17,14 +18,6 @@ const FILTER_TYPES: Record<FilterTab, string[]> = {
   Document: ['case', 'document'],
 };
 
-interface RichItem {
-  _id: string;
-  type: string;
-  title: string;
-  subtitle: string;
-  createdAt: string;
-}
-
 interface Props {
   data: DashboardData | null;
   onClose: () => void;
@@ -33,7 +26,7 @@ interface Props {
 export default function ActivityHistoryModal({ data, onClose }: Props) {
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterTab>('All');
-  const [items, setItems] = useState<RichItem[]>([]);
+  const [items, setItems] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const FILTERS: FilterTab[] = ['All', 'Quizzes', 'AI Sessions', 'Document'];
 
@@ -46,9 +39,9 @@ export default function ActivityHistoryModal({ data, onClose }: Props) {
     void (async () => {
       try {
         const res = await getDashboardActivity(token, { limit: 50 });
-        // API: { success, data: RichItem[], meta: {...} }
+        // API: { success, data: ActivityItem[], meta: {...} }
         const raw = Array.isArray(res.data) ? res.data : [];
-        setItems(raw as RichItem[]);
+        setItems(raw as ActivityItem[]);
       } catch {
         // leave empty
       } finally {
@@ -184,30 +177,46 @@ export default function ActivityHistoryModal({ data, onClose }: Props) {
           ) : filtered.length === 0 ? (
             <li className={styles.emptyItem}>No activity found.</li>
           ) : (
-            filtered.map((item) => (
-              <li key={item._id} className={styles.activityItem}>
-                <div className={styles.activityIcon} aria-hidden="true">
-                  <ActivityIcon type={item.type} />
-                </div>
-                <div className={styles.activityBody}>
-                  <p className={styles.activityTitle}>{item.title || 'Untitled'}</p>
-                  <p className={styles.activityMeta}>
-                    {item.createdAt
-                      ? `${new Date(item.createdAt).toLocaleDateString()}`
-                      : 'Recently'}{' '}
-                    · {item.subtitle || typeLabel(item.type)}
-                  </p>
-                </div>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path
-                    d="M9 18l6-6-6-6"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </li>
-            ))
+            filtered.map((item) => {
+              const body = (
+                <>
+                  <div className={styles.activityIcon} aria-hidden="true">
+                    <ActivityIcon type={item.type} />
+                  </div>
+                  <div className={styles.activityBody}>
+                    <p className={styles.activityTitle}>{item.title || 'Untitled'}</p>
+                    <p className={styles.activityMeta}>
+                      {item.createdAt
+                        ? `${new Date(item.createdAt).toLocaleDateString()}`
+                        : 'Recently'}{' '}
+                      · {item.subtitle || typeLabel(item.type)}
+                    </p>
+                  </div>
+                  {item.link && (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path
+                        d="M9 18l6-6-6-6"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  )}
+                </>
+              );
+
+              return (
+                <li key={item._id} className={styles.activityItem}>
+                  {item.link ? (
+                    <Link href={item.link} className={styles.activityLink} onClick={onClose}>
+                      {body}
+                    </Link>
+                  ) : (
+                    <div className={styles.activityStatic}>{body}</div>
+                  )}
+                </li>
+              );
+            })
           )}
         </ul>
       </div>
