@@ -6,7 +6,7 @@ import { ErrorBoundary } from '@/components';
 import { ToastProvider } from '@/components/ui/Toast';
 import '../styles/globals.scss';
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://legalerrand.com';
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://academy.legalerrand.com';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
